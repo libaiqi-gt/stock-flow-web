@@ -3,8 +3,9 @@ import { onMounted, ref, computed } from 'vue'
 import { useInventoryStore } from '@/stores/inventory'
 import { useUserStore } from '@/stores/user'
 import { useExpiry } from '@/composables/useExpiry'
-import { Search, Refresh, Upload } from '@element-plus/icons-vue'
+import { Search, Refresh, Upload, Plus } from '@element-plus/icons-vue'
 import ConsumeModal from '@/components/ConsumeModal.vue'
+import InboundModal from '@/components/InboundModal.vue'
 import type { InventoryItem } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -14,6 +15,7 @@ const { getExpiryStatus } = useExpiry()
 
 const searchTerm = ref('')
 const showConsumeModal = ref(false)
+const showInboundModal = ref(false)
 const selectedItem = ref<InventoryItem | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isImporting = ref(false)
@@ -35,7 +37,6 @@ onMounted(() => {
 
 const filteredInventory = computed(() => {
   const data = inventoryStore.inventory
-  console.log(data, 'data')
   if (!Array.isArray(data)) return []
   if (!searchTerm.value) return data
   const term = searchTerm.value.toLowerCase()
@@ -179,6 +180,10 @@ const handleFileChange = async (event: Event) => {
             </el-button>
           </el-tooltip>
 
+          <el-button type="primary" :icon="Plus" @click="showInboundModal = true">
+            添加库存
+          </el-button>
+
           <el-button
             type="primary"
             plain
@@ -260,7 +265,7 @@ const handleFileChange = async (event: Event) => {
               领用
             </el-button>
             <el-button
-              v-if="userStore.currentUser?.role === 'Admin'"
+              v-if="userStore.currentUser?.role === 'Admin' && row.initial_qty === row.current_qty"
               type="danger"
               link
               @click="handleDelete(row)"
@@ -273,6 +278,7 @@ const handleFileChange = async (event: Event) => {
     </div>
 
     <ConsumeModal v-model="showConsumeModal" :item="selectedItem" />
+    <InboundModal v-model:visible="showInboundModal" @success="handleRefresh" />
   </div>
 </template>
 
@@ -294,68 +300,66 @@ const handleFileChange = async (event: Event) => {
 
 .toolbar {
   padding: 1.25rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  background-color: rgba(255, 255, 255, 0.5);
+  background-color: #f8fafc;
+}
 
-  .search-box {
-    flex: 1;
-    max-width: 24rem;
-  }
+.search-box {
+  width: 300px;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
 }
 
 .custom-table {
   flex: 1;
+  overflow: hidden;
 
-  :deep(.el-table__header) {
-    th {
-      background-color: #f8fafc;
-      color: #64748b;
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-    }
+  :deep(.el-table__inner-wrapper) {
+    height: 100%;
   }
+}
 
-  .warning {
-    color: #f97316;
-    font-weight: bold;
-  }
-  .expired {
-    color: #dc2626;
-    font-weight: bold;
-  }
-  .normal {
-    color: #10b981;
-  }
+.stock-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 
-  .stock-cell {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
+.warning-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-    .warning-wrapper {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      line-height: 1.2;
-    }
+.warning-tag {
+  font-size: 10px;
+  height: 20px;
+  padding: 0 4px;
+}
 
-    .text-danger {
-      color: #dc2626;
-      font-weight: bold;
-    }
+.text-danger {
+  color: #f56c6c;
+  font-weight: bold;
+}
 
-    .warning-tag {
-      margin-top: 2px;
-      font-size: 0.7rem;
-      transform: scale(0.9);
-      transform-origin: right center;
-    }
-  }
+/* Expiry status colors */
+.expiry-expired {
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+.expiry-warning {
+  color: #e6a23c;
+  font-weight: bold;
+}
+
+.expiry-normal {
+  color: #606266;
 }
 </style>

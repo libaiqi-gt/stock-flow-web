@@ -21,6 +21,7 @@
 - Props 定义使用 `defineProps` (推荐使用 TypeScript 泛型语法，如果项目是 JS 则使用对象语法)。
 - Emits 定义使用 `defineEmits`。
 - 单个文件代码不能超过 600 行（不包含空行和注释）。
+- 禁止使用any类型
 
 ## 2. Styling (Important!)
 

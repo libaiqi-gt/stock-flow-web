@@ -121,6 +121,21 @@ export const useInventoryStore = defineStore('inventory', () => {
     }
   }
 
+  const addInventoryItem = async (data: InboundDTO) => {
+    loading.value = true
+    try {
+      await importInventoryApi(data)
+      ElMessage.success('入库成功')
+      await fetchInventory()
+      return true
+    } catch (error) {
+      console.error('Failed to add inventory:', error)
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   const batchImport = async (file: File) => {
     // 强制刷新HMR
     loading.value = true
@@ -204,6 +219,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     fetchInventory,
     fetchOutbound,
     fetchStats,
+    addInventoryItem,
     importInventory,
     batchImport,
     consumeItem,
