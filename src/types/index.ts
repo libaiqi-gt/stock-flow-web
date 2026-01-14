@@ -103,7 +103,7 @@ export interface Material {
   /** 效期报警时限(天) */
   expiry_alert_days?: number
   /** 开封后有效期(天) */
-  open_expiry_days?: number
+  opened_expiry_days?: number
   created_at: string
   updated_at: string
 }

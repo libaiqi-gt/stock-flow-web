@@ -5,6 +5,9 @@ import { markOutboundFinished } from '@/api/inventory'
 import type { OutboundItem } from '@/types'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { Check } from '@element-plus/icons-vue'
+import { useExpiry } from '@/composables/useExpiry'
+
+const { getExpiryStatus } = useExpiry()
 
 const loading = ref(false)
 const list = ref<OutboundItem[]>([])
@@ -76,13 +79,30 @@ const getStatusText = (status: string) => {
 
 const formatDate = (date: string) => {
   if (!date) return '-'
-  return new Date(date).toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  return date.substring(0, 10)
+}
+
+const calculateEffectiveExpiry = (row: OutboundItem) => {
+  const inventoryExpiry = row.inventory?.expiry_date
+  if (!inventoryExpiry) return ''
+
+  const openDate = row.opening_date
+  const openDays = Number(row.inventory?.material?.opened_expiry_days)
+  // 如果没有开封效期限制，或者没有开封日期，则以库存有效期为准
+  if (!openDays || !openDate) return inventoryExpiry
+
+  // 计算开封后的截止日期
+  const openDateObj = new Date(openDate)
+  // 加上天数 (ms): 天 * 24小时 * 60分钟 * 60秒 * 1000毫秒
+  const openExpiryTime = openDateObj.getTime() + openDays * 24 * 60 * 60 * 1000
+  const invExpiryTime = new Date(inventoryExpiry).getTime()
+  console.log('openExpiryTime', openExpiryTime)
+  console.log('invExpiryTime', invExpiryTime)
+  // 取较早的日期
+  if (openExpiryTime < invExpiryTime) {
+    return new Date(openExpiryTime).toISOString().substring(0, 10)
+  }
+  return inventoryExpiry
 }
 
 const handleMarkFinished = (row: OutboundItem) => {
@@ -114,18 +134,18 @@ const handleMarkFinished = (row: OutboundItem) => {
       </div>
 
       <el-table v-loading="loading" :data="list" stripe class="custom-table" style="width: 100%">
-        <el-table-column prop="outbound_no" label="单号" width="160" />
+        <el-table-column prop="outbound_no" label="单号" width="160" show-overflow-tooltip />
         <el-table-column label="领用人" width="120">
           <template #default="{ row }">
             {{ row.user?.real_name || row.user?.username }}
           </template>
         </el-table-column>
-        <el-table-column label="物料名称" min-width="120">
+        <el-table-column label="物料名称" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.inventory?.material?.name }}
           </template>
         </el-table-column>
-        <el-table-column label="规格" width="120">
+        <el-table-column label="规格" width="120" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.inventory?.material?.spec }}
           </template>
@@ -135,18 +155,57 @@ const handleMarkFinished = (row: OutboundItem) => {
             {{ row.quantity }} {{ row.inventory?.material?.unit }}
           </template>
         </el-table-column>
-        <el-table-column prop="purpose" label="用途" width="120" />
-        <el-table-column label="开封日期" width="160">
+        <el-table-column prop="purpose" label="用途" width="120" show-overflow-tooltip />
+        <el-table-column label="开封日期" width="120">
           <template #default="{ row }">
             {{ formatDate(row.opening_date) }}
           </template>
         </el-table-column>
-        <el-table-column label="申请日期" width="160">
+        <el-table-column label="有效期至" width="160">
+          <template #default="{ row }">
+            <div class="expiry-wrapper">
+              <span
+                :class="`expiry-${getExpiryStatus(calculateEffectiveExpiry(row), row.inventory?.material?.expiry_alert_days).status}`"
+              >
+                {{ formatDate(calculateEffectiveExpiry(row)) }}
+              </span>
+              <el-tag
+                v-if="
+                  getExpiryStatus(
+                    calculateEffectiveExpiry(row),
+                    row.inventory?.material?.expiry_alert_days,
+                  ).status === 'expired'
+                "
+                type="danger"
+                size="small"
+                effect="plain"
+                class="warning-tag"
+              >
+                已过期
+              </el-tag>
+              <el-tag
+                v-else-if="
+                  getExpiryStatus(
+                    calculateEffectiveExpiry(row),
+                    row.inventory?.material?.expiry_alert_days,
+                  ).status === 'warning'
+                "
+                type="warning"
+                size="small"
+                effect="plain"
+                class="warning-tag"
+              >
+                即将过期
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="申请日期" width="120">
           <template #default="{ row }">
             {{ formatDate(row.apply_date) }}
           </template>
         </el-table-column>
-        <el-table-column label="使用状态" width="100">
+        <el-table-column label="使用状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)">
               {{ getStatusText(row.status) }}
@@ -235,5 +294,33 @@ const handleMarkFinished = (row: OutboundItem) => {
 }
 .text-xs {
   font-size: 12px;
+}
+
+.expiry-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.warning-tag {
+  font-size: 10px;
+  height: 20px;
+  padding: 0 4px;
+}
+
+/* Expiry status colors - keeping consistent with other views */
+.expiry-expired {
+  color: #f56c6c;
+  font-weight: bold;
+}
+
+.expiry-warning {
+  color: #e6a23c;
+  font-weight: bold;
+}
+
+.expiry-normal {
+  color: #606266;
 }
 </style>

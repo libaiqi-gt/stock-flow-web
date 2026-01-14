@@ -266,6 +266,18 @@ const handleFileChange = async (event: Event) => {
               >
                 已过期
               </el-tag>
+              <el-tag
+                v-else-if="
+                  getExpiryStatus(row.expiry_date, row.material?.expiry_alert_days).status ===
+                  'warning'
+                "
+                type="warning"
+                size="small"
+                effect="plain"
+                class="warning-tag"
+              >
+                即将过期
+              </el-tag>
             </div>
           </template>
         </el-table-column>
@@ -349,14 +361,16 @@ const handleFileChange = async (event: Event) => {
 
 .expiry-wrapper {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .warning-wrapper {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 .warning-tag {
