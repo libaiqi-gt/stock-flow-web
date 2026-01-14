@@ -33,10 +33,10 @@ export const useInventoryStore = defineStore('inventory', () => {
   const stats = computed(() => {
     const totalItems = inventory.value.length
     const warningItems = inventory.value.filter(
-      (i) => getExpiryStatus(i.expiry_date).status === 'warning',
+      (i) => getExpiryStatus(i.expiry_date, i.material?.expiry_alert_days).status === 'warning',
     ).length
     const expiredItems = inventory.value.filter(
-      (i) => getExpiryStatus(i.expiry_date).status === 'expired',
+      (i) => getExpiryStatus(i.expiry_date, i.material?.expiry_alert_days).status === 'expired',
     ).length
     return { totalItems, warningItems, expiredItems }
   })
@@ -196,7 +196,7 @@ export const useInventoryStore = defineStore('inventory', () => {
       await fetchInventory()
     } catch (error) {
       console.error('Delete failed:', error)
-      ElMessage.error('删除失败')
+      ElMessage.error('请管理员检查是否有该库存有领用申请尚未审批')
       throw error
     } finally {
       loading.value = false

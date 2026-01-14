@@ -246,11 +246,27 @@ const handleFileChange = async (event: Event) => {
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="有效期至" min-width="120">
+        <el-table-column label="有效期至" min-width="150">
           <template #default="{ row }">
-            <span :class="getExpiryStatus(row.expiry_date).status">
-              {{ row.expiry_date ? row.expiry_date.substring(0, 10) : '-' }}
-            </span>
+            <div class="expiry-wrapper">
+              <span
+                :class="`expiry-${getExpiryStatus(row.expiry_date, row.material?.expiry_alert_days).status}`"
+              >
+                {{ row.expiry_date ? row.expiry_date.substring(0, 10) : '-' }}
+              </span>
+              <el-tag
+                v-if="
+                  getExpiryStatus(row.expiry_date, row.material?.expiry_alert_days).status ===
+                  'expired'
+                "
+                type="danger"
+                size="small"
+                effect="plain"
+                class="warning-tag"
+              >
+                已过期
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
 
@@ -329,6 +345,12 @@ const handleFileChange = async (event: Event) => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+}
+
+.expiry-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .warning-wrapper {

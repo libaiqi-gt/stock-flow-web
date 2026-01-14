@@ -179,7 +179,7 @@ const handleSubmit = async () => {
               :min="1"
               controls-position="right"
               class="w-full"
-              placeholder="默认30天"
+              placeholder="默认60天"
             />
           </el-form-item>
         </el-col>

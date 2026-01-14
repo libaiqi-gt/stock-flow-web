@@ -1,7 +1,7 @@
 import type { ExpiryStatus } from '@/types'
 
 export function useExpiry() {
-  const getExpiryStatus = (expiryDate: string): ExpiryStatus => {
+  const getExpiryStatus = (expiryDate: string, alertDays: number = 60): ExpiryStatus => {
     const today = new Date()
     const expiry = new Date(expiryDate)
     const diffTime = expiry.getTime() - today.getTime()
@@ -14,7 +14,7 @@ export function useExpiry() {
         type: 'danger',
       }
     }
-    if (diffDays <= 60) {
+    if (diffDays <= alertDays) {
       return {
         status: 'warning',
         label: '即将过期',
