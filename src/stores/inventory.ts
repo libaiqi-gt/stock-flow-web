@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { InventoryItem, UsageTrend, OutboundItem } from '@/types'
+import type { InventoryItem, UsageTrend, OutboundItem, DashboardApiStats } from '@/types'
 import { useExpiry } from '@/composables/useExpiry'
 import {
   getInventoryList,
@@ -9,6 +9,7 @@ import {
   markOutboundFinished as markOutboundFinishedApi,
   deleteInventory,
 } from '@/api/inventory'
+import { getDashboardStats } from '@/api/statistics'
 import { applyOutbound, getAllOutboundList } from '@/api/outbound'
 import type { InboundDTO } from '@/api/inventory'
 import { ElMessage } from 'element-plus'
@@ -18,6 +19,7 @@ export const useInventoryStore = defineStore('inventory', () => {
 
   const inventory = ref<InventoryItem[]>([])
   const outboundRecords = ref<OutboundItem[]>([])
+  const dashboardStats = ref<DashboardApiStats | null>(null)
   const usageTrend = ref<UsageTrend[]>([
     { label: '1月', value: 45, color: 'bg-blue-500' },
     { label: '2月', value: 52, color: 'bg-blue-500' },
@@ -25,12 +27,20 @@ export const useInventoryStore = defineStore('inventory', () => {
     { label: '4月', value: 65, color: 'bg-indigo-500' },
     { label: '5月', value: 48, color: 'bg-blue-500' },
     { label: '6月', value: 60, color: 'bg-blue-500' },
-  ]) // Mock data for now since API is missing
+  ]) // Initial mock data, will be overwritten by API
 
   const loading = ref(false)
 
   // Getters (Computed)
   const stats = computed(() => {
+    if (dashboardStats.value) {
+      return {
+        totalItems: dashboardStats.value.total_batches,
+        warningItems: dashboardStats.value.warning_batches.count,
+        expiredItems: dashboardStats.value.expired_batches,
+      }
+    }
+    // Fallback to local calculation
     const totalItems = inventory.value.length
     const warningItems = inventory.value.filter(
       (i) => getExpiryStatus(i.expiry_date, i.material?.expiry_alert_days).status === 'warning',
@@ -94,16 +104,35 @@ export const useInventoryStore = defineStore('inventory', () => {
   }
 
   const fetchStats = async () => {
-    // try {
-    //   const res = await getDashboardStats()
-    //   // 假设接口返回结构包含 trend
-    //   if (res.data && (res.data as any).trend) {
-    //     usageTrend.value = (res.data as any).trend
-    //   }
-    // } catch (error) {
-    //   console.error('Failed to fetch stats', error)
-    // }
-    // Temporarily using mock data initialized in state
+    loading.value = true
+    try {
+      const res = await getDashboardStats()
+      dashboardStats.value = res.data
+
+      // Update usageTrend from API
+      if (res.data.outbound_trend && Array.isArray(res.data.outbound_trend)) {
+        usageTrend.value = res.data.outbound_trend.map((item, index) => {
+          // Dynamic color assignment based on trend
+          const colors = [
+            'bg-rose-300',
+            'bg-red-400',
+            'bg-rose-400',
+            'bg-red-500',
+            'bg-rose-500',
+            'bg-red-600',
+          ]
+          return {
+            label: item.month,
+            value: item.total_qty,
+            color: colors[index % colors.length] as string,
+          }
+        })
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats', error)
+    } finally {
+      loading.value = false
+    }
   }
 
   const importInventory = async (data: InboundDTO[]) => {
@@ -214,8 +243,9 @@ export const useInventoryStore = defineStore('inventory', () => {
     inventory,
     outboundRecords,
     usageTrend,
-    stats,
+    dashboardStats,
     loading,
+    stats,
     fetchInventory,
     fetchOutbound,
     fetchStats,

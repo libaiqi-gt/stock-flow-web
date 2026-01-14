@@ -174,7 +174,7 @@ export interface BatchImportResult {
 }
 
 /**
- * 仪表盘统计数据模型
+ * 仪表盘统计数据模型 (UI)
  */
 export interface DashboardStats {
   totalItems: number
@@ -187,6 +187,34 @@ export interface UsageTrend {
   label: string
   value: number
   color: string
+}
+
+/**
+ * 仪表盘统计数据模型 (API)
+ */
+export interface WarningBatch {
+  id: number
+  batch_no: string
+  material_name: string
+  expiry_date: string
+  expiry_alert_days: number
+}
+
+export interface MonthlyOutbound {
+  month: string
+  total_qty: number
+}
+
+export interface WarningBatchesStats {
+  count: number
+  list: WarningBatch[]
+}
+
+export interface DashboardApiStats {
+  total_batches: number
+  warning_batches: WarningBatchesStats
+  expired_batches: number
+  outbound_trend: MonthlyOutbound[]
 }
 
 /**

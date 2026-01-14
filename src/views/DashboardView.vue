@@ -1,13 +1,38 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, computed } from 'vue'
 import { useInventoryStore } from '@/stores/inventory'
-import { Box, Warning, CircleClose, TrendCharts } from '@element-plus/icons-vue'
+import { Box, Warning, CircleClose, TrendCharts, Top, Bottom } from '@element-plus/icons-vue'
+import StatCard from '@/components/StatCard.vue'
 
 const inventoryStore = useInventoryStore()
 
+// 计算图表最大值，用于归一化高度
+const maxTrendValue = computed(() => {
+  if (inventoryStore.usageTrend.length === 0) return 100
+  return Math.max(...inventoryStore.usageTrend.map((item) => item.value)) || 100
+})
+
+// 计算同比趋势
+const trendInfo = computed(() => {
+  const trend = inventoryStore.usageTrend
+  if (trend.length < 2) return { value: '0%', isUp: true }
+
+  const lastMonth = trend[trend.length - 1]?.value || 0
+  const prevMonth = trend[trend.length - 2]?.value || 0
+
+  if (prevMonth === 0) return { value: '100%', isUp: true }
+
+  const diff = lastMonth - prevMonth
+  const percentage = Math.abs((diff / prevMonth) * 100).toFixed(1)
+
+  return {
+    value: `${percentage}%`,
+    isUp: diff >= 0,
+  }
+})
+
 onMounted(() => {
   inventoryStore.fetchStats()
-  inventoryStore.fetchInventory() // Needed for stats computed from inventory list
 })
 </script>
 
@@ -16,49 +41,49 @@ onMounted(() => {
     <!-- 统计卡片 -->
     <div class="stats-grid">
       <!-- 库存总批次 -->
-      <div class="stat-card total">
-        <div class="bg-decoration-icon"><Box /></div>
-        <div class="card-header">
-          <h3>库存总批次</h3>
-          <div class="icon-badge">
-            <el-icon><Box /></el-icon>
-          </div>
-        </div>
-        <div class="stat-value">{{ inventoryStore.stats.totalItems }}</div>
-        <div class="stat-desc">当前系统在管物资批次</div>
-      </div>
+      <StatCard
+        title="库存总批次"
+        :value="inventoryStore.stats.totalItems"
+        description="当前系统在管物资批次"
+        type="total"
+        :loading="inventoryStore.loading"
+      >
+        <template #icon>
+          <el-icon><Box /></el-icon>
+        </template>
+      </StatCard>
 
       <!-- 临期预警 -->
-      <div class="stat-card warning">
-        <div class="bg-decoration"></div>
-        <div class="card-header">
-          <h3>临期预警 (60天)</h3>
-          <div class="icon-badge">
-            <el-icon><Warning /></el-icon>
-          </div>
-        </div>
-        <div class="stat-value">{{ inventoryStore.stats.warningItems }}</div>
-        <div class="stat-desc">
+      <StatCard
+        title="临期预警"
+        :value="inventoryStore.stats.warningItems"
+        description="建议优先领用 (FEFO)"
+        type="warning"
+        :loading="inventoryStore.loading"
+      >
+        <template #icon>
+          <el-icon><Warning /></el-icon>
+        </template>
+        <template #desc-prefix>
           <span class="dot-pulse"></span>
-          建议优先领用 (FEFO)
-        </div>
-      </div>
+        </template>
+      </StatCard>
 
       <!-- 已过期 -->
-      <div class="stat-card expired">
-        <div class="bg-decoration"></div>
-        <div class="card-header">
-          <h3>已过期</h3>
-          <div class="icon-badge">
-            <el-icon><CircleClose /></el-icon>
-          </div>
-        </div>
-        <div class="stat-value">{{ inventoryStore.stats.expiredItems }}</div>
-        <div class="stat-desc">
+      <StatCard
+        title="已过期"
+        :value="inventoryStore.stats.expiredItems"
+        description="请立即冻结并报废"
+        type="expired"
+        :loading="inventoryStore.loading"
+      >
+        <template #icon>
+          <el-icon><CircleClose /></el-icon>
+        </template>
+        <template #desc-prefix>
           <span class="dot"></span>
-          请立即冻结并报废
-        </div>
-      </div>
+        </template>
+      </StatCard>
     </div>
 
     <!-- 历史图表 -->
@@ -73,21 +98,29 @@ onMounted(() => {
             <p>近半年领用出库数据分析</p>
           </div>
         </div>
-        <div class="trend-badge">
-          <el-icon><TrendCharts /></el-icon>
-          <span>同比上涨 12.5%</span>
+        <div class="trend-badge" :class="{ 'trend-down': !trendInfo.isUp }">
+          <el-icon v-if="trendInfo.isUp"><Top /></el-icon>
+          <el-icon v-else><Bottom /></el-icon>
+          <span>环比{{ trendInfo.isUp ? '上涨' : '下降' }} {{ trendInfo.value }}</span>
         </div>
       </div>
 
       <div class="chart-body">
+        <div v-if="inventoryStore.loading" class="chart-loading">加载中...</div>
+        <div v-else-if="inventoryStore.usageTrend.length === 0" class="chart-empty">暂无数据</div>
         <div
+          v-else
           v-for="(item, index) in inventoryStore.usageTrend"
           :key="index"
           class="chart-bar-wrapper"
         >
           <div class="bar-container">
             <div class="tooltip">{{ item.value }} 件</div>
-            <div class="bar" :class="item.color" :style="{ height: `${item.value}%` }">
+            <div
+              class="bar"
+              :class="item.color"
+              :style="{ height: `${(item.value / maxTrendValue) * 100}%` }"
+            >
               <div class="bar-highlight"></div>
             </div>
           </div>
@@ -126,186 +159,22 @@ onMounted(() => {
   @media (min-width: 768px) {
     grid-template-columns: repeat(3, 1fr);
   }
-}
 
-.stat-card {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 1rem;
-  border: 1px solid #f1f5f9;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s;
-
-  &:hover {
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+  .dot-pulse {
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    background: #f97316;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
   }
 
-  .card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1rem;
-    position: relative;
-    z-index: 10;
-
-    h3 {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .icon-badge {
-      padding: 0.5rem;
-      border-radius: 0.5rem;
-      display: flex;
-    }
-  }
-
-  .stat-value {
-    font-size: 2.25rem;
-    font-weight: 900;
-    line-height: 1;
-    margin-bottom: 0.25rem;
-    position: relative;
-    z-index: 10;
-  }
-
-  .stat-desc {
-    font-size: 0.75rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    position: relative;
-    z-index: 10;
-  }
-
-  // Variants
-  &.total {
-    border-color: #f1f5f9; // slate-100
-
-    .bg-decoration-icon {
-      position: absolute;
-      right: 0;
-      top: 0;
-      padding: 1rem;
-      opacity: 0.05;
-      font-size: 6rem;
-      transition: transform 0.5s;
-      color: #1e293b;
-    }
-    &:hover .bg-decoration-icon {
-      transform: scale(1.1);
-    }
-
-    h3 {
-      color: #64748b;
-    }
-    .icon-badge {
-      background: #fef2f2;
-      color: #dc2626;
-    }
-    &:hover .icon-badge {
-      background: #dc2626;
-      color: white;
-      transition: background 0.3s;
-    }
-    .stat-value {
-      color: #1e293b;
-    }
-    .stat-desc {
-      color: #94a3b8;
-    }
-  }
-
-  &.warning {
-    border-color: #ffedd5; // orange-100
-    box-shadow: 0 2px 10px -3px rgba(249, 115, 22, 0.1);
-
-    .bg-decoration {
-      position: absolute;
-      right: -1.5rem;
-      top: -1.5rem;
-      width: 8rem;
-      height: 8rem;
-      background: #fff7ed;
-      border-radius: 50%;
-      opacity: 0.5;
-      transition: transform 0.5s;
-    }
-    &:hover .bg-decoration {
-      transform: scale(1.1);
-    }
-
-    h3 {
-      color: #ea580c;
-      opacity: 0.8;
-    }
-    .icon-badge {
-      background: #ffedd5;
-      color: #ea580c;
-    }
-    .stat-value {
-      color: #ea580c;
-    }
-    .stat-desc {
-      color: rgba(234, 88, 12, 0.7);
-    }
-
-    .dot-pulse {
-      display: inline-block;
-      width: 0.375rem;
-      height: 0.375rem;
-      background: #f97316;
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-  }
-
-  &.expired {
-    border-color: #fee2e2; // red-100
-    box-shadow: 0 2px 10px -3px rgba(220, 38, 38, 0.1);
-
-    .bg-decoration {
-      position: absolute;
-      right: -1.5rem;
-      top: -1.5rem;
-      width: 8rem;
-      height: 8rem;
-      background: #fef2f2;
-      border-radius: 50%;
-      opacity: 0.5;
-      transition: transform 0.5s;
-    }
-    &:hover .bg-decoration {
-      transform: scale(1.1);
-    }
-
-    h3 {
-      color: #b91c1c;
-      opacity: 0.8;
-    }
-    .icon-badge {
-      background: #fee2e2;
-      color: #b91c1c;
-    }
-    .stat-value {
-      color: #b91c1c;
-    }
-    .stat-desc {
-      color: rgba(185, 28, 28, 0.7);
-    }
-
-    .dot {
-      display: inline-block;
-      width: 0.375rem;
-      height: 0.375rem;
-      background: #dc2626;
-      border-radius: 50%;
-    }
+  .dot {
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    background: #dc2626;
+    border-radius: 50%;
   }
 }
 
@@ -359,6 +228,12 @@ onMounted(() => {
       border-radius: 0.5rem;
       font-size: 0.875rem;
       font-weight: 700;
+
+      &.trend-down {
+        color: #dc2626; // red-600
+        background: #fef2f2; // red-50
+        border-color: #fee2e2; // red-100
+      }
     }
   }
 
@@ -369,6 +244,20 @@ onMounted(() => {
     justify-content: space-between;
     gap: 1.5rem;
     padding: 0 1rem;
+    position: relative;
+
+    .chart-loading,
+    .chart-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 0.875rem;
+      background: rgba(255, 255, 255, 0.8);
+      z-index: 10;
+    }
 
     .chart-bar-wrapper {
       flex: 1;
