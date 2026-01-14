@@ -18,6 +18,17 @@ const selectedItem = ref<InventoryItem | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isImporting = ref(false)
 
+const isBelowSafetyStock = (item: InventoryItem) => {
+  const current = Number(item.current_qty)
+  // 尝试获取 safety_stock，兼容可能的大小写或嵌套问题
+  const mat = item.material as unknown as Record<string, number>
+  const safety = Number(mat?.safety_stock ?? mat?.safetyStock)
+  if (isNaN(current) || isNaN(safety)) return false
+  if (safety < 0) return false
+
+  return current <= safety
+}
+
 onMounted(() => {
   inventoryStore.fetchInventory()
 })
@@ -210,8 +221,25 @@ const handleFileChange = async (event: Event) => {
           show-overflow-tooltip
         />
         <el-table-column prop="batch_no" label="内部批号" min-width="120" show-overflow-tooltip />
-        <el-table-column label="当前库存数量" min-width="120" align="right">
-          <template #default="{ row }"> {{ row.current_qty }} {{ row.material?.unit }} </template>
+        <el-table-column label="当前库存数量" min-width="140" align="right">
+          <template #default="{ row }">
+            <div class="stock-cell">
+              <el-tooltip
+                v-if="isBelowSafetyStock(row)"
+                effect="dark"
+                :content="`安全库存: ${row.material?.safety_stock ?? row.material?.safetyStock}`"
+                placement="top"
+              >
+                <div class="warning-wrapper">
+                  <span class="text-danger"> {{ row.current_qty }} {{ row.material?.unit }} </span>
+                  <el-tag type="danger" size="small" effect="plain" class="warning-tag">
+                    低于安全库存
+                  </el-tag>
+                </div>
+              </el-tooltip>
+              <span v-else> {{ row.current_qty }} {{ row.material?.unit }} </span>
+            </div>
+          </template>
         </el-table-column>
         <el-table-column label="有效期至" min-width="120">
           <template #default="{ row }">
@@ -303,6 +331,31 @@ const handleFileChange = async (event: Event) => {
   }
   .normal {
     color: #10b981;
+  }
+
+  .stock-cell {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+
+    .warning-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      line-height: 1.2;
+    }
+
+    .text-danger {
+      color: #dc2626;
+      font-weight: bold;
+    }
+
+    .warning-tag {
+      margin-top: 2px;
+      font-size: 0.7rem;
+      transform: scale(0.9);
+      transform-origin: right center;
+    }
   }
 }
 </style>
