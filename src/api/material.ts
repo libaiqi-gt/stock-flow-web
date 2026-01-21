@@ -1,5 +1,5 @@
 import request from '@/utils/http'
-import type { Material, ApiResponse } from '@/types'
+import type { Material, ApiResponse, BatchImportResult } from '@/types'
 
 /**
  * 创建物料请求DTO
@@ -35,6 +35,21 @@ export const getMaterialList = (params?: {
  */
 export const createMaterial = (data: CreateMaterialDTO) => {
   return request.post<ApiResponse<Material>>('/api/v1/materials', data)
+}
+
+/**
+ * 批量导入Excel
+ * POST /api/v1/materials/import
+ */
+export const batchImportMaterial = (file: File) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<BatchImportResult>('/api/v1/materials/import', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 30000, // 30s timeout
+  })
 }
 
 /**

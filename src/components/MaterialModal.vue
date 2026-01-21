@@ -29,14 +29,14 @@ const formData = reactive<CreateMaterialDTO>({
   spec: '',
   unit: '',
   brand: '',
-  safety_stock: undefined,
-  expiry_alert_days: undefined,
+  safety_stock: 10,
+  expiry_alert_days: 60,
   opened_expiry_days: undefined,
 })
 
 // Local state for Year/Month inputs
 const openExpiryYears = ref<number | undefined>(undefined)
-const openExpiryMonths = ref<number | undefined>(undefined)
+const openExpiryMonths = ref<number | undefined>(6)
 
 const totalOpenExpiryDays = computed(() => {
   const y = openExpiryYears.value || 0
@@ -168,7 +168,7 @@ const handleSubmit = async () => {
               :min="0"
               controls-position="right"
               class="w-full"
-              placeholder="0"
+              placeholder="默认10个"
             />
           </el-form-item>
         </el-col>

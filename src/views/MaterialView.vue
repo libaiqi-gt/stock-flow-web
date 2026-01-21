@@ -2,7 +2,7 @@
 import { onMounted, ref, reactive } from 'vue'
 import { useMaterialStore } from '@/stores/material'
 import { useUserStore } from '@/stores/user'
-import { Search, Plus, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
 import MaterialModal from '@/components/MaterialModal.vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { deleteMaterial } from '@/api/material'
@@ -12,6 +12,9 @@ const userStore = useUserStore()
 
 const searchName = ref('')
 const showModal = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const isImporting = ref(false)
+const isDownloadingTemplate = ref(false)
 const pagination = reactive({
   page: 1,
   pageSize: 10,
@@ -43,6 +46,96 @@ const fetchData = () => {
 
 const handleAddSuccess = () => {
   fetchData()
+}
+
+/**
+ * 下载Excel模板
+ */
+const handleDownloadTemplate = async () => {
+  isDownloadingTemplate.value = true
+  try {
+    // 使用 import.meta.env.BASE_URL 确保路径正确 (Vite)
+    const baseUrl = import.meta.env.BASE_URL
+    const templateUrl = `${baseUrl}物料模板.xlsx`.replace('//', '/')
+
+    const response = await fetch(templateUrl)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '物料模板.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Download template failed:', error)
+    ElMessage.error('下载模板失败，请检查文件是否存在')
+  } finally {
+    isDownloadingTemplate.value = false
+  }
+}
+
+const handleImportClick = () => {
+  fileInput.value?.click()
+}
+
+const handleFileChange = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+
+  const file = input.files[0]
+  if (!file) return
+
+  // 重置 input value，允许重复上传同一文件
+  input.value = ''
+
+  // 1. 校验文件格式
+  const isExcel = /\.(xlsx|xls)$/.test(file.name)
+  if (!isExcel) {
+    ElMessage.error('仅支持上传 .xlsx 或 .xls 格式的文件')
+    return
+  }
+
+  // 2. 校验文件大小 (10MB)
+  const isLt10M = file.size / 1024 / 1024 <= 10
+  if (!isLt10M) {
+    ElMessage.error('文件大小不能超过 10MB')
+    return
+  }
+
+  try {
+    isImporting.value = true
+    const result = await materialStore.batchImport(file)
+    if (result) {
+      const { success, failed, errors } = result
+      const msg = `导入完成：成功 ${success} 条，失败 ${failed} 条`
+      if (failed > 0) {
+        // 如果有失败，显示详细信息
+        const errorDetails = errors.slice(0, 3).join('; ')
+        ElMessageBox.alert(
+          `<div><p>${msg}</p><p style="color: red; margin-top: 10px;">错误示例: ${errorDetails}${
+            errors.length > 3 ? '...' : ''
+          }</p></div>`,
+          '导入结果',
+          { dangerouslyUseHTMLString: true },
+        )
+      } else {
+        ElMessage.success(msg)
+      }
+      // 刷新列表
+      fetchData()
+    }
+  } catch (error) {
+    console.error('Import failed:', error)
+    ElMessage.error('导入失败，请重试')
+  } finally {
+    isImporting.value = false
+  }
 }
 
 const handleDelete = (row: Record<string, unknown>) => {
@@ -81,10 +174,6 @@ onMounted(() => {
     <div class="card">
       <!-- Toolbar -->
       <div class="toolbar">
-        <div class="left-actions">
-          <el-button type="primary" :icon="Plus" @click="showModal = true">新增物料</el-button>
-        </div>
-
         <div class="search-box">
           <el-input
             v-model="searchName"
@@ -98,6 +187,36 @@ onMounted(() => {
               <el-button :icon="Search" @click="handleSearch" />
             </template>
           </el-input>
+        </div>
+        <div class="left-actions">
+          <input
+            ref="fileInput"
+            type="file"
+            accept=".xlsx, .xls"
+            style="display: none"
+            @change="handleFileChange"
+          />
+          <el-button type="primary" :icon="Plus" @click="showModal = true">新增物料</el-button>
+          <el-tooltip content="点击导入Excel数据" placement="top">
+            <el-button
+              type="success"
+              plain
+              :icon="Upload"
+              :loading="isImporting"
+              @click="handleImportClick"
+            >
+              导入数据
+            </el-button>
+          </el-tooltip>
+          <el-button
+            type="warning"
+            plain
+            :icon="Download"
+            :loading="isDownloadingTemplate"
+            @click="handleDownloadTemplate"
+          >
+            下载Excel模板
+          </el-button>
         </div>
       </div>
 

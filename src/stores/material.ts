@@ -1,7 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Material } from '@/types'
-import { getMaterialList, createMaterial as createMaterialApi, type CreateMaterialDTO } from '@/api/material'
+import {
+  getMaterialList,
+  createMaterial as createMaterialApi,
+  batchImportMaterial,
+  type CreateMaterialDTO,
+} from '@/api/material'
 import { ElMessage } from 'element-plus'
 
 export const useMaterialStore = defineStore('material', () => {
@@ -20,7 +25,7 @@ export const useMaterialStore = defineStore('material', () => {
         materials.value = res.data
         // If backend returns just array, we can't really know total unless it's in headers or another field
         // For now, assume length if no total field
-        total.value = res.data.length 
+        total.value = res.data.length
       } else if (res.data && typeof res.data === 'object') {
         const data = res.data as {
           items?: Material[]
@@ -60,11 +65,22 @@ export const useMaterialStore = defineStore('material', () => {
     }
   }
 
+  const batchImport = async (file: File) => {
+    loading.value = true
+    try {
+      const res = await batchImportMaterial(file)
+      return res.data
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     materials,
     total,
     loading,
     fetchMaterials,
     createMaterial,
+    batchImport,
   }
 })
