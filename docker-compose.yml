@@ -1,0 +1,16 @@
+services:
+  frontend:
+    # 本地测试时可以用 build，服务器部署用 image
+    # build: .
+    image: crpi-3dw8a74xwr0aba1i.cn-guangzhou.personal.cr.aliyuncs.com/bq-project-space/stock-flow-web:latest
+    container_name: app_frontend
+    restart: always
+    ports:
+      - '80:80'
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    external: true
+    name: my_shared_network

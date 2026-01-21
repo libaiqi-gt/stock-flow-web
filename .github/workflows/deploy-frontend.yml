@@ -1,0 +1,76 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: ['main']
+  # 允许在 GitHub 界面手动点击按钮触发
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 1. 登录阿里云 ACR
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.ALIYUN_REGISTRY }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 2. 构建并推送镜像
+      - name: Build and Push Image
+        uses: docker/build-push-action@v4
+        with:
+          # 构建上下文是当前目录
+          context: .
+          push: true
+          # ⚠️ 注意替换这里的命名空间
+          tags: ${{ secrets.ALIYUN_REGISTRY }}/bq-project-space/stock-flow-web:latest
+
+      # 3. SSH 连接服务器并部署
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # 登录 ACR (防止服务器重启后 token 过期无法拉取)
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login --username ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin ${{ secrets.ALIYUN_REGISTRY }}
+
+            # --- 关键点 1：使用独立的前端目录 ---
+            mkdir -p /data/frontend
+            cd /data/frontend
+
+            # --- 关键点 2：生成前端专属的 docker-compose.yml ---
+            cat <<EOF > docker-compose.yml 
+            services:
+              frontend:
+                # 镜像地址
+                image: ${{ secrets.ALIYUN_REGISTRY }}/bq-project-space/stock-flow-web:latest
+                container_name: app_frontend
+                restart: always
+                # 只有前端占用 80 端口
+                ports:
+                  - "80:80"
+                # 加入共享网络
+                networks:
+                  - app_network
+
+            # --- 关键点 3：声明使用外部已创建的网络 ---
+            networks:
+              app_network:
+                external: true
+                name: my_shared_network
+            EOF
+
+            # 拉取最新镜像并重启
+            docker compose pull
+            docker compose up -d
+
+            # 清理无用的旧镜像
+            docker image prune -f
