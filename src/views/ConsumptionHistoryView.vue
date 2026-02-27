@@ -28,7 +28,7 @@ const fetchList = async () => {
       total.value = data.total || 0
     }
   } catch (error) {
-    console.error(error)
+    console.error(error, '错误')
   } finally {
     loading.value = false
   }
