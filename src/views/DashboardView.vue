@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
 import { useInventoryStore } from '@/stores/inventory'
-import { Box, Warning, CircleClose, TrendCharts, Top, Bottom } from '@element-plus/icons-vue'
+import { Box, Warning, BellFilled, CircleClose, TrendCharts, Top, Bottom } from '@element-plus/icons-vue'
 import StatCard from '@/components/StatCard.vue'
 
 const inventoryStore = useInventoryStore()
@@ -66,6 +66,21 @@ onMounted(() => {
         </template>
         <template #desc-prefix>
           <span class="dot-pulse"></span>
+        </template>
+      </StatCard>
+
+      <StatCard
+        title="安全库存预警"
+        :value="inventoryStore.stats.safetyStockWarningItems"
+        description="低于安全库存，建议补货"
+        type="safety"
+        :loading="inventoryStore.loading"
+      >
+        <template #icon>
+          <el-icon><BellFilled /></el-icon>
+        </template>
+        <template #desc-prefix>
+          <span class="dot-safety"></span>
         </template>
       </StatCard>
 
@@ -157,7 +172,11 @@ onMounted(() => {
   gap: 1.5rem;
 
   @media (min-width: 768px) {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1024px) {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .dot-pulse {
@@ -167,6 +186,14 @@ onMounted(() => {
     background: #f97316;
     border-radius: 50%;
     animation: pulse 2s infinite;
+  }
+
+  .dot-safety {
+    display: inline-block;
+    width: 0.375rem;
+    height: 0.375rem;
+    background: #f59e0b;
+    border-radius: 50%;
   }
 
   .dot {

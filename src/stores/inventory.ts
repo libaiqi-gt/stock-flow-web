@@ -37,6 +37,7 @@ export const useInventoryStore = defineStore('inventory', () => {
       return {
         totalItems: dashboardStats.value.total_batches,
         warningItems: dashboardStats.value.warning_batches.count,
+        safetyStockWarningItems: dashboardStats.value.safety_stock_warning_count ?? 0,
         expiredItems: dashboardStats.value.expired_batches,
       }
     }
@@ -48,7 +49,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     const expiredItems = inventory.value.filter(
       (i) => getExpiryStatus(i.expiry_date, i.material?.expiry_alert_days).status === 'expired',
     ).length
-    return { totalItems, warningItems, expiredItems }
+    return { totalItems, warningItems, safetyStockWarningItems: 0, expiredItems }
   })
 
   // Actions

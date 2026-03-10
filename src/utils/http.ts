@@ -50,6 +50,16 @@ class Request {
           // 这里我们返回 response.data 以便获取完整信息 (如 code 用于判断)
           // 或者根据项目约定，直接返回 data.data
           return response.data as unknown as AxiosResponse
+        } else if (code === 401) {
+          // 处理未授权错误
+          ElMessage.error(msg || '未授权，请登录')
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          // 如果不是在登录页，则跳转
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login'
+          }
+          return Promise.reject(new Error(msg || '未授权，请登录'))
         } else {
           // 处理业务错误
           ElMessage.error(msg || '系统错误')
@@ -123,8 +133,8 @@ class Request {
 
 // 导出实例
 const request = new Request({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api', // 基础路径，可配置在 .env 文件中
-  timeout: 10000, // 超时时间
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080' || '/api', // 基础路径，可配置在 .env 文件中
+  timeout: 60000, // 超时时间
 })
 
 export default request

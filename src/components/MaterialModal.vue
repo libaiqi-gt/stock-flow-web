@@ -4,9 +4,12 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { useMaterialStore } from '@/stores/material'
 import type { CreateMaterialDTO } from '@/api/material'
 import { Warning } from '@element-plus/icons-vue'
+import type { Material } from '@/types'
 
 const props = defineProps<{
   modelValue: boolean
+  mode?: 'create' | 'edit'
+  material?: Material | null
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +24,11 @@ const visible = computed({
   get: () => props.modelValue,
   set: (val) => emit('update:modelValue', val),
 })
+
+const mode = computed(() => props.mode ?? (props.material ? 'edit' : 'create'))
+
+const dialogTitle = computed(() => (mode.value === 'edit' ? '编辑物料' : '新增物料'))
+const confirmText = computed(() => (mode.value === 'edit' ? '确认保存' : '确认新增'))
 
 const formData = reactive<CreateMaterialDTO>({
   code: '',
@@ -85,12 +93,54 @@ watch(visible, (val) => {
   }
 })
 
+const fillFromMaterial = (m: Material) => {
+  formData.code = m.code ?? ''
+  formData.name = m.name ?? ''
+  formData.category = m.category ?? ''
+  formData.spec = m.spec ?? ''
+  formData.unit = m.unit ?? ''
+  formData.brand = m.brand ?? ''
+  formData.safety_stock = m.safety_stock ?? 0
+  formData.expiry_alert_days = m.expiry_alert_days ?? 0
+
+  const days = m.opened_expiry_days
+  if (typeof days === 'number') {
+    formData.opened_expiry_days = days
+    const y = Math.floor(days / 365)
+    const remain = days - y * 365
+    const mo = Math.floor(remain / 30)
+    openExpiryYears.value = y
+    openExpiryMonths.value = mo
+  } else {
+    formData.opened_expiry_days = undefined
+    openExpiryYears.value = undefined
+    openExpiryMonths.value = undefined
+  }
+}
+
+watch(
+  () => [visible.value, props.material, mode.value] as const,
+  ([v, m, currentMode]) => {
+    if (!v) return
+    if (currentMode === 'edit' && m) {
+      fillFromMaterial(m)
+    } else {
+      formRef.value?.resetFields()
+      openExpiryYears.value = undefined
+      openExpiryMonths.value = 6
+    }
+  },
+)
+
 const handleSubmit = async () => {
   if (!formRef.value) return
 
   await formRef.value.validate(async (valid) => {
     if (valid) {
-      const success = await materialStore.createMaterial(formData)
+      const success =
+        mode.value === 'edit' && props.material?.id
+          ? await materialStore.updateMaterial(props.material.id, formData)
+          : await materialStore.createMaterial(formData)
       if (success) {
         visible.value = false
         emit('success')
@@ -103,7 +153,7 @@ const handleSubmit = async () => {
 <template>
   <el-dialog
     v-model="visible"
-    title="新增物料"
+    :title="dialogTitle"
     width="600px"
     destroy-on-close
     :close-on-click-modal="false"
@@ -231,7 +281,7 @@ const handleSubmit = async () => {
       <span class="dialog-footer">
         <el-button @click="visible = false">取消</el-button>
         <el-button type="primary" :loading="materialStore.loading" @click="handleSubmit">
-          确认新增
+          {{ confirmText }}
         </el-button>
       </span>
     </template>

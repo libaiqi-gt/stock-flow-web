@@ -17,6 +17,8 @@ export interface CreateMaterialDTO {
   opened_expiry_days?: number
 }
 
+export type UpdateMaterialDTO = Partial<CreateMaterialDTO>
+
 /**
  * 获取物料列表
  * GET /api/v1/materials
@@ -58,4 +60,12 @@ export const batchImportMaterial = (file: File) => {
  */
 export const deleteMaterial = (id: number) => {
   return request.delete(`/api/v1/materials/${id}`)
+}
+
+/**
+ * 更新物料
+ * PUT /api/v1/materials/{id}
+ */
+export const updateMaterial = (id: number, data: UpdateMaterialDTO) => {
+  return request.put<ApiResponse<Material>>(`/api/v1/materials/${id}`, data)
 }

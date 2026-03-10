@@ -179,6 +179,7 @@ export interface BatchImportResult {
 export interface DashboardStats {
   totalItems: number
   warningItems: number
+  safetyStockWarningItems: number
   expiredItems: number
   trend: UsageTrend[]
 }
@@ -213,6 +214,7 @@ export interface WarningBatchesStats {
 export interface DashboardApiStats {
   total_batches: number
   warning_batches: WarningBatchesStats
+  safety_stock_warning_count: number
   expired_batches: number
   outbound_trend: MonthlyOutbound[]
 }

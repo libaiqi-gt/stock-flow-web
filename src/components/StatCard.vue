@@ -5,7 +5,7 @@ const props = defineProps<{
   title: string
   value: number | string
   description?: string
-  type?: 'total' | 'warning' | 'expired'
+  type?: 'total' | 'warning' | 'safety' | 'expired'
   loading?: boolean
 }>()
 
@@ -213,6 +213,41 @@ const cardClass = computed(() => {
     }
     .stat-desc {
       color: rgba(185, 28, 28, 0.7);
+    }
+  }
+
+  &.safety {
+    border-color: #fef3c7; // amber-100
+    box-shadow: 0 2px 10px -3px rgba(245, 158, 11, 0.12);
+
+    .bg-decoration {
+      position: absolute;
+      right: -1.5rem;
+      top: -1.5rem;
+      width: 8rem;
+      height: 8rem;
+      background: #fffbeb;
+      border-radius: 50%;
+      opacity: 0.5;
+      transition: transform 0.5s;
+    }
+    &:hover .bg-decoration {
+      transform: scale(1.1);
+    }
+
+    h3 {
+      color: #b45309;
+      opacity: 0.85;
+    }
+    .icon-badge {
+      background: #fef3c7;
+      color: #b45309;
+    }
+    .stat-value {
+      color: #b45309;
+    }
+    .stat-desc {
+      color: rgba(180, 83, 9, 0.75);
     }
   }
 }

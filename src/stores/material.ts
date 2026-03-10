@@ -6,6 +6,8 @@ import {
   createMaterial as createMaterialApi,
   batchImportMaterial,
   type CreateMaterialDTO,
+  updateMaterial as updateMaterialApi,
+  type UpdateMaterialDTO,
 } from '@/api/material'
 import { ElMessage } from 'element-plus'
 
@@ -65,6 +67,20 @@ export const useMaterialStore = defineStore('material', () => {
     }
   }
 
+  const updateMaterial = async (id: number, data: UpdateMaterialDTO) => {
+    loading.value = true
+    try {
+      await updateMaterialApi(id, data)
+      ElMessage.success('物料更新成功')
+      return true
+    } catch (error) {
+      console.error('Failed to update material:', error)
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   const batchImport = async (file: File) => {
     loading.value = true
     try {
@@ -81,6 +97,7 @@ export const useMaterialStore = defineStore('material', () => {
     loading,
     fetchMaterials,
     createMaterial,
+    updateMaterial,
     batchImport,
   }
 })

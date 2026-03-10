@@ -2,16 +2,19 @@
 import { onMounted, ref, reactive } from 'vue'
 import { useMaterialStore } from '@/stores/material'
 import { useUserStore } from '@/stores/user'
-import { Search, Plus, Delete, Upload, Download } from '@element-plus/icons-vue'
+import { Search, Plus, EditPen, Delete, Upload, Download } from '@element-plus/icons-vue'
 import MaterialModal from '@/components/MaterialModal.vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { deleteMaterial } from '@/api/material'
+import type { Material } from '@/types'
 
 const materialStore = useMaterialStore()
 const userStore = useUserStore()
 
 const searchName = ref('')
 const showModal = ref(false)
+const modalMode = ref<'create' | 'edit'>('create')
+const editingMaterial = ref<Material | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isImporting = ref(false)
 const isDownloadingTemplate = ref(false)
@@ -46,6 +49,18 @@ const fetchData = () => {
 
 const handleAddSuccess = () => {
   fetchData()
+}
+
+const handleCreate = () => {
+  modalMode.value = 'create'
+  editingMaterial.value = null
+  showModal.value = true
+}
+
+const handleEdit = (row: Material) => {
+  modalMode.value = 'edit'
+  editingMaterial.value = row
+  showModal.value = true
 }
 
 /**
@@ -138,9 +153,9 @@ const handleFileChange = async (event: Event) => {
   }
 }
 
-const handleDelete = (row: Record<string, unknown>) => {
+const handleDelete = (row: Material) => {
   ElMessageBox.confirm(
-    `确定要删除物料 "${row?.name}" 吗？此操作不可恢复，且可能影响相关库存记录。`,
+    `确定要删除物料 "${row.name}" 吗？此操作不可恢复，且可能影响相关库存记录。`,
     '删除确认',
     {
       confirmButtonText: '确定',
@@ -150,7 +165,7 @@ const handleDelete = (row: Record<string, unknown>) => {
   )
     .then(async () => {
       try {
-        await deleteMaterial(row.id as number)
+        await deleteMaterial(row.id)
         ElMessage.success('删除成功')
         // 刷新当前页
         fetchData()
@@ -196,7 +211,7 @@ onMounted(() => {
             style="display: none"
             @change="handleFileChange"
           />
-          <el-button type="primary" :icon="Plus" @click="showModal = true">新增物料</el-button>
+          <el-button type="primary" :icon="Plus" @click="handleCreate">新增物料</el-button>
           <el-tooltip content="点击导入Excel数据" placement="top">
             <el-button
               type="success"
@@ -265,12 +280,13 @@ onMounted(() => {
 
         <el-table-column
           label="操作"
-          width="100"
+          width="150"
           fixed="right"
           align="center"
           v-if="userStore.currentUser?.role === 'Admin'"
         >
           <template #default="{ row }">
+            <el-button type="primary" link :icon="EditPen" @click="handleEdit(row)">编辑</el-button>
             <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">
               删除
             </el-button>
@@ -292,7 +308,12 @@ onMounted(() => {
       </div>
     </div>
 
-    <MaterialModal v-model="showModal" @success="handleAddSuccess" />
+    <MaterialModal
+      v-model="showModal"
+      :mode="modalMode"
+      :material="editingMaterial"
+      @success="handleAddSuccess"
+    />
   </div>
 </template>
 
