@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, watch } from 'vue'
-import { type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useInventoryStore } from '@/stores/inventory'
 import { getMaterialList } from '@/api/material'
 import type { Material } from '@/types'
@@ -46,6 +46,60 @@ const rules = reactive<FormRules<InboundDTO>>({
   batchNo: [{ required: true, message: '请输入批号', trigger: 'blur' }],
   expiryDate: [{ required: true, message: '请选择有效期', trigger: 'change' }],
 })
+
+const normalizeDateString = (raw: string): string | null => {
+  const text = raw.trim()
+  if (!text) return null
+
+  let yearStr = ''
+  let monthStr = ''
+  let dayStr = ''
+
+  if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(text)) {
+    const parts = text.split(/[-/.]/)
+    yearStr = parts[0] || ''
+    monthStr = parts[1] || ''
+    dayStr = parts[2] || ''
+  } else {
+    const digits = text.replace(/\D/g, '')
+    if (digits.length === 8) {
+      yearStr = digits.slice(0, 4)
+      monthStr = digits.slice(4, 6)
+      dayStr = digits.slice(6, 8)
+    } else if (digits.length === 6) {
+      yearStr = `20${digits.slice(0, 2)}`
+      monthStr = digits.slice(2, 4)
+      dayStr = digits.slice(4, 6)
+    } else {
+      return null
+    }
+  }
+
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const day = Number(dayStr)
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
+  if (year < 1900 || year > 2100) return null
+  if (month < 1 || month > 12) return null
+  if (day < 1 || day > 31) return null
+
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
+
+  const mm = String(month).padStart(2, '0')
+  const dd = String(day).padStart(2, '0')
+  return `${year}-${mm}-${dd}`
+}
+
+const handleExpiryBlur = () => {
+  if (!form.expiryDate) return
+  const normalized = normalizeDateString(form.expiryDate)
+  if (!normalized) {
+    ElMessage.warning('日期格式不正确，请输入如 2026-03-11 或 20260311')
+    return
+  }
+  form.expiryDate = normalized
+}
 
 // 监听 visible 变化，初始化数据
 watch(
@@ -237,6 +291,7 @@ const handleClose = () => {
           placeholder="选择日期"
           format="YYYY-MM-DD"
           value-format="YYYY-MM-DD"
+          @blur="handleExpiryBlur"
           style="width: 100%"
         />
       </el-form-item>

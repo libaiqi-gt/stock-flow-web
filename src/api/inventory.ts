@@ -31,14 +31,16 @@ export interface ApplyOutboundReq {
  * 获取库存列表
  * GET /api/v1/inventory
  */
-export const getInventoryList = (params?: {
+export interface GetInventoryListParams {
   page?: number
   page_size?: number
   material_name?: string
   code?: string
   batch_no?: string
   status?: number // 0:全部, 1:正常, 2:临期, 3:过期
-}) => {
+}
+
+export const getInventoryList = (params?: GetInventoryListParams) => {
   return request.get<InventoryItem[]>('/api/v1/inventory', { params })
 }
 

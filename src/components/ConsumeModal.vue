@@ -36,6 +36,60 @@ const rules = reactive<FormRules>({
   remarks: [{ max: 100, message: '备注不能超过100个字符', trigger: 'blur' }],
 })
 
+const normalizeDateString = (raw: string): string | null => {
+  const text = raw.trim()
+  if (!text) return null
+
+  let yearStr = ''
+  let monthStr = ''
+  let dayStr = ''
+
+  if (/^\d{4}[-/.]\d{1,2}[-/.]\d{1,2}$/.test(text)) {
+    const parts = text.split(/[-/.]/)
+    yearStr = parts[0] || ''
+    monthStr = parts[1] || ''
+    dayStr = parts[2] || ''
+  } else {
+    const digits = text.replace(/\D/g, '')
+    if (digits.length === 8) {
+      yearStr = digits.slice(0, 4)
+      monthStr = digits.slice(4, 6)
+      dayStr = digits.slice(6, 8)
+    } else if (digits.length === 6) {
+      yearStr = `20${digits.slice(0, 2)}`
+      monthStr = digits.slice(2, 4)
+      dayStr = digits.slice(4, 6)
+    } else {
+      return null
+    }
+  }
+
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const day = Number(dayStr)
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
+  if (year < 1900 || year > 2100) return null
+  if (month < 1 || month > 12) return null
+  if (day < 1 || day > 31) return null
+
+  const date = new Date(year, month - 1, day)
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null
+
+  const mm = String(month).padStart(2, '0')
+  const dd = String(day).padStart(2, '0')
+  return `${year}-${mm}-${dd}`
+}
+
+const handleOpeningDateBlur = () => {
+  if (!formData.opening_date) return
+  const normalized = normalizeDateString(formData.opening_date)
+  if (!normalized) {
+    ElMessage.warning('日期格式不正确，请输入如 2026-03-11 或 20260311')
+    return
+  }
+  formData.opening_date = normalized
+}
+
 const loading = ref(false)
 
 const visible = computed({
@@ -141,6 +195,7 @@ const handleConfirm = async () => {
             placeholder="选择日期"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
+            @blur="handleOpeningDateBlur"
             class="w-full"
           />
         </el-form-item>

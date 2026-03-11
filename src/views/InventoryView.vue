@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, ref, computed, reactive } from 'vue'
 import { useInventoryStore } from '@/stores/inventory'
 import { useUserStore } from '@/stores/user'
 import { useExpiry } from '@/composables/useExpiry'
-import { Search, Refresh, Upload, Plus } from '@element-plus/icons-vue'
+import { Search, Upload, Plus, Download } from '@element-plus/icons-vue'
 import ConsumeModal from '@/components/ConsumeModal.vue'
 import InboundModal from '@/components/InboundModal.vue'
 import type { InventoryItem } from '@/types'
@@ -19,6 +19,11 @@ const showInboundModal = ref(false)
 const selectedItem = ref<InventoryItem | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 const isImporting = ref(false)
+const isDownloadingTemplate = ref(false)
+const pagination = reactive({
+  page: 1,
+  pageSize: 10,
+})
 
 const isBelowSafetyStock = (item: InventoryItem) => {
   const current = Number(item.current_qty)
@@ -32,8 +37,15 @@ const isBelowSafetyStock = (item: InventoryItem) => {
 }
 
 onMounted(() => {
-  inventoryStore.fetchInventory()
+  fetchData()
 })
+
+const fetchData = () => {
+  inventoryStore.fetchInventory({
+    page: pagination.page,
+    page_size: pagination.pageSize,
+  })
+}
 
 const filteredInventory = computed(() => {
   const data = inventoryStore.inventory
@@ -48,9 +60,25 @@ const filteredInventory = computed(() => {
   )
 })
 
-const handleRefresh = () => {
-  inventoryStore.fetchInventory()
-  ElMessage.success('数据已更新')
+const handleSearch = () => {
+  pagination.page = 1
+  fetchData()
+}
+
+const handlePageChange = (page: number) => {
+  pagination.page = page
+  fetchData()
+}
+
+const handleSizeChange = (size: number) => {
+  pagination.pageSize = size
+  pagination.page = 1
+  fetchData()
+}
+
+const handleInboundSuccess = async () => {
+  await fetchData()
+  ElMessage.success('库存已更新')
 }
 
 const openConsumeModal = (item: InventoryItem) => {
@@ -77,6 +105,32 @@ const handleDelete = (item: InventoryItem) => {
  */
 const handleImportClick = () => {
   fileInput.value?.click()
+}
+
+const handleDownloadTemplate = async () => {
+  isDownloadingTemplate.value = true
+  try {
+    const baseUrl = import.meta.env.BASE_URL
+    const templateUrl = `${baseUrl}库存模板.xlsx`.replace('//', '/')
+    const response = await fetch(templateUrl)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '库存模板.xlsx'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Download template failed:', error)
+    ElMessage.error('下载模板失败，请检查文件是否存在')
+  } finally {
+    isDownloadingTemplate.value = false
+  }
 }
 
 /**
@@ -135,7 +189,7 @@ const handleFileChange = async (event: Event) => {
       }
 
       // 5. 自动刷新列表
-      await inventoryStore.fetchInventory()
+      await fetchData()
     }
   } catch (error) {
     console.error('Import failed:', error)
@@ -157,10 +211,11 @@ const handleFileChange = async (event: Event) => {
             placeholder="搜索编码、名称或批号..."
             :prefix-icon="Search"
             clearable
+            @clear="handleSearch"
+            @keyup.enter="handleSearch"
           />
         </div>
         <div class="actions">
-          <!-- 隐藏的文件输入框 -->
           <input
             ref="fileInput"
             type="file"
@@ -168,6 +223,9 @@ const handleFileChange = async (event: Event) => {
             style="display: none"
             @change="handleFileChange"
           />
+          <el-button type="primary" :icon="Plus" @click="showInboundModal = true">
+            添加库存
+          </el-button>
           <el-tooltip content="点击导入Excel数据" placement="top">
             <el-button
               type="success"
@@ -179,19 +237,14 @@ const handleFileChange = async (event: Event) => {
               导入数据
             </el-button>
           </el-tooltip>
-
-          <el-button type="primary" :icon="Plus" @click="showInboundModal = true">
-            添加库存
-          </el-button>
-
           <el-button
-            type="primary"
+            type="warning"
             plain
-            :icon="Refresh"
-            :loading="inventoryStore.loading"
-            @click="handleRefresh"
+            :icon="Download"
+            :loading="isDownloadingTemplate"
+            @click="handleDownloadTemplate"
           >
-            刷新列表
+            下载Excel模板
           </el-button>
         </div>
       </div>
@@ -303,10 +356,22 @@ const handleFileChange = async (event: Event) => {
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="inventoryStore.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
     </div>
 
     <ConsumeModal v-model="showConsumeModal" :item="selectedItem" />
-    <InboundModal v-model:visible="showInboundModal" @success="handleRefresh" />
+    <InboundModal v-model:visible="showInboundModal" @success="handleInboundSuccess" />
   </div>
 </template>
 
@@ -351,6 +416,14 @@ const handleFileChange = async (event: Event) => {
   :deep(.el-table__inner-wrapper) {
     height: 100%;
   }
+}
+
+.pagination-container {
+  padding: 12px 16px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
+  background-color: white;
 }
 
 .stock-cell {

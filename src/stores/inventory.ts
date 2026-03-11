@@ -11,15 +11,17 @@ import {
 } from '@/api/inventory'
 import { getDashboardStats } from '@/api/statistics'
 import { applyOutbound, getAllOutboundList } from '@/api/outbound'
-import type { InboundDTO } from '@/api/inventory'
+import type { InboundDTO, GetInventoryListParams } from '@/api/inventory'
 import { ElMessage } from 'element-plus'
 
 export const useInventoryStore = defineStore('inventory', () => {
   const { getExpiryStatus } = useExpiry()
 
   const inventory = ref<InventoryItem[]>([])
+  const total = ref(0)
   const outboundRecords = ref<OutboundItem[]>([])
   const dashboardStats = ref<DashboardApiStats | null>(null)
+  const lastFetchParams = ref<GetInventoryListParams | undefined>(undefined)
   const usageTrend = ref<UsageTrend[]>([
     { label: '1月', value: 45, color: 'bg-blue-500' },
     { label: '2月', value: 52, color: 'bg-blue-500' },
@@ -53,24 +55,33 @@ export const useInventoryStore = defineStore('inventory', () => {
   })
 
   // Actions
-  const fetchInventory = async (params?: Record<string, unknown>) => {
+  const fetchInventory = async (params?: GetInventoryListParams) => {
     loading.value = true
     try {
-      const res = await getInventoryList(params)
+      if (params) {
+        lastFetchParams.value = params
+      }
+      const finalParams = params ?? lastFetchParams.value
+      const res = await getInventoryList(finalParams)
       // 兼容处理：支持直接返回数组或分页对象 { items: [], total: 0 }
       if (Array.isArray(res.data)) {
         inventory.value = res.data
+        total.value = res.data.length
       } else if (res.data && typeof res.data === 'object') {
         const data = res.data as {
           items?: InventoryItem[]
           list?: InventoryItem[]
           records?: InventoryItem[]
+          total?: number
+          count?: number
         }
         const list = data.items || data.list || data.records
         if (Array.isArray(list)) {
           inventory.value = list
+          total.value = data.total ?? data.count ?? list.length
         } else {
           inventory.value = []
+          total.value = 0
           console.warn(
             'Inventory data format unexpected, expected array or { items: [] }:',
             res.data,
@@ -78,9 +89,11 @@ export const useInventoryStore = defineStore('inventory', () => {
         }
       } else {
         inventory.value = []
+        total.value = 0
       }
     } catch {
       inventory.value = []
+      total.value = 0
     } finally {
       loading.value = false
     }
@@ -242,6 +255,7 @@ export const useInventoryStore = defineStore('inventory', () => {
 
   return {
     inventory,
+    total,
     outboundRecords,
     usageTrend,
     dashboardStats,

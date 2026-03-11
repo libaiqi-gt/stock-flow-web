@@ -133,7 +133,7 @@ class Request {
 
 // 导出实例
 const request = new Request({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api', // 基础路径，可配置在 .env 文件中
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080' || '/api', // 基础路径，可配置在 .env 文件中
   timeout: 60000, // 超时时间
 })
 
