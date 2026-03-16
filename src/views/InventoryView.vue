@@ -44,20 +44,14 @@ const fetchData = () => {
   inventoryStore.fetchInventory({
     page: pagination.page,
     page_size: pagination.pageSize,
+    material_name: searchTerm.value || undefined,
   })
 }
 
 const filteredInventory = computed(() => {
   const data = inventoryStore.inventory
   if (!Array.isArray(data)) return []
-  if (!searchTerm.value) return data
-  const term = searchTerm.value.toLowerCase()
-  return data.filter(
-    (item) =>
-      item.material?.name.toLowerCase().includes(term) ||
-      item.material?.code.toLowerCase().includes(term) ||
-      item.batch_no.toLowerCase().includes(term),
-  )
+  return data
 })
 
 const handleSearch = () => {
@@ -208,7 +202,7 @@ const handleFileChange = async (event: Event) => {
         <div class="search-box">
           <el-input
             v-model="searchTerm"
-            placeholder="搜索编码、名称或批号..."
+            placeholder="请输入物料名称搜索"
             :prefix-icon="Search"
             clearable
             @clear="handleSearch"
