@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onMounted, computed } from 'vue'
 import { useInventoryStore } from '@/stores/inventory'
-import { Box, Warning, BellFilled, CircleClose, TrendCharts, Top, Bottom } from '@element-plus/icons-vue'
+import { Box, Warning, BellFilled, CircleClose, TrendCharts, Top, Bottom, RefreshRight } from '@element-plus/icons-vue'
 import StatCard from '@/components/StatCard.vue'
+import { useRouter } from 'vue-router'
 
 const inventoryStore = useInventoryStore()
+const router = useRouter()
 
 // 计算图表最大值，用于归一化高度
 const maxTrendValue = computed(() => {
@@ -31,6 +33,14 @@ const trendInfo = computed(() => {
   }
 })
 
+const handleRefresh = () => {
+  inventoryStore.fetchStats()
+}
+
+const navigateToInventory = (filterType: string) => {
+  router.push({ name: 'inventory', query: { filterType } })
+}
+
 onMounted(() => {
   inventoryStore.fetchStats()
 })
@@ -47,6 +57,8 @@ onMounted(() => {
         description="当前系统在管物资批次"
         type="total"
         :loading="inventoryStore.loading"
+        @click="navigateToInventory('all')"
+        class="cursor-pointer"
       >
         <template #icon>
           <el-icon><Box /></el-icon>
@@ -60,6 +72,8 @@ onMounted(() => {
         description="建议优先领用 (FEFO)"
         type="warning"
         :loading="inventoryStore.loading"
+        @click="navigateToInventory('warning')"
+        class="cursor-pointer"
       >
         <template #icon>
           <el-icon><Warning /></el-icon>
@@ -75,6 +89,8 @@ onMounted(() => {
         description="低于安全库存，建议补货"
         type="safety"
         :loading="inventoryStore.loading"
+        @click="navigateToInventory('safety')"
+        class="cursor-pointer"
       >
         <template #icon>
           <el-icon><BellFilled /></el-icon>
@@ -91,6 +107,8 @@ onMounted(() => {
         description="请立即冻结并报废"
         type="expired"
         :loading="inventoryStore.loading"
+        @click="navigateToInventory('expired')"
+        class="cursor-pointer"
       >
         <template #icon>
           <el-icon><CircleClose /></el-icon>
@@ -113,10 +131,22 @@ onMounted(() => {
             <p>近半年领用出库数据分析</p>
           </div>
         </div>
-        <div class="trend-badge" :class="{ 'trend-down': !trendInfo.isUp }">
-          <el-icon v-if="trendInfo.isUp"><Top /></el-icon>
-          <el-icon v-else><Bottom /></el-icon>
-          <span>环比{{ trendInfo.isUp ? '上涨' : '下降' }} {{ trendInfo.value }}</span>
+        <div class="header-actions">
+          <div class="trend-badge" :class="{ 'trend-down': !trendInfo.isUp }">
+            <el-icon v-if="trendInfo.isUp"><Top /></el-icon>
+            <el-icon v-else><Bottom /></el-icon>
+            <span>环比{{ trendInfo.isUp ? '上涨' : '下降' }} {{ trendInfo.value }}</span>
+          </div>
+          <el-button
+            type="primary"
+            plain
+            size="small"
+            :icon="RefreshRight"
+            @click="handleRefresh"
+            :loading="inventoryStore.loading"
+          >
+            刷新数据
+          </el-button>
         </div>
       </div>
 
@@ -164,6 +194,10 @@ onMounted(() => {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }
 
 .stats-grid {
@@ -244,22 +278,28 @@ onMounted(() => {
       }
     }
 
-    .trend-badge {
+    .header-actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      color: #059669; // emerald-600
-      background: #ecfdf5; // emerald-50
-      border: 1px solid #d1fae5;
-      padding: 0.375rem 0.75rem;
-      border-radius: 0.5rem;
-      font-size: 0.875rem;
-      font-weight: 700;
+      gap: 1rem;
 
-      &.trend-down {
-        color: #dc2626; // red-600
-        background: #fef2f2; // red-50
-        border-color: #fee2e2; // red-100
+      .trend-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #059669; // emerald-600
+        background: #ecfdf5; // emerald-50
+        border: 1px solid #d1fae5;
+        padding: 0.375rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 700;
+
+        &.trend-down {
+          color: #dc2626; // red-600
+          background: #fef2f2; // red-50
+          border-color: #fee2e2; // red-100
+        }
       }
     }
   }

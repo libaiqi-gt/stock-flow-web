@@ -1,5 +1,11 @@
 import http from '@/utils/http'
-import type { ApiResponse, ApplyOutboundReq, AuditOutboundReq, OutboundItem } from '@/types'
+import type {
+  ApiResponse,
+  ApplyOutboundReq,
+  AuditOutboundReq,
+  EditAuditOutboundReq,
+  OutboundItem,
+} from '@/types'
 
 /**
  * 提交领用申请
@@ -9,9 +15,21 @@ export const applyOutbound = (data: ApplyOutboundReq) => {
 }
 
 /**
+ * 审批管理编辑待审批领用申请
+ */
+export const updateOutbound = (id: number, data: EditAuditOutboundReq) => {
+  return http.put<ApiResponse<null>>(`/api/v1/outbound/audit/${id}`, data)
+}
+
+/**
  * 获取我的领用记录
  */
-export const getMyOutbound = (params: { page: number; page_size: number }) => {
+export const getMyOutbound = (params: {
+  page: number
+  page_size: number
+  keyword?: string
+  status?: string
+}) => {
   return http.get<ApiResponse<{ list: OutboundItem[]; total: number }>>('/api/v1/outbound/my', {
     params,
   })
@@ -20,16 +38,19 @@ export const getMyOutbound = (params: { page: number; page_size: number }) => {
 /**
  * 获取所有领用记录
  */
-export const getAllOutboundList = (params: { page: number; page_size: number }) => {
+export const getAllOutboundList = (params: {
+  page: number
+  page_size: number
+  keyword?: string
+  status?: 'PENDING' | 'USING' | 'FINISHED' | '待审批' | '使用中' | '已用完'
+}) => {
   return http.get<ApiResponse<{ list: OutboundItem[]; total: number }>>('/api/v1/outbound/all', {
     params,
   })
 }
 
 /**
- * 获取待审批列表 (管理员)
- * 猜测接口: GET /api/v1/outbound/audit 或 /api/v1/outbound/list
- * 这里暂时使用 /api/v1/outbound/audit 并假设它支持 GET
+ * 获取审批列表 (管理员)
  */
 export const getAuditList = (params: {
   page: number

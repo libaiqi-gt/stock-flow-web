@@ -1,22 +1,27 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, reactive } from 'vue'
+import { ref, computed, reactive, watch } from 'vue'
 import { useInventoryStore } from '@/stores/inventory'
 import { useUserStore } from '@/stores/user'
 import { useExpiry } from '@/composables/useExpiry'
-import { Search, Upload, Plus, Download } from '@element-plus/icons-vue'
+import { Search, Upload, Plus, Download, ShoppingCart } from '@element-plus/icons-vue'
 import ConsumeModal from '@/components/ConsumeModal.vue'
+import BatchConsumeModal from '@/components/BatchConsumeModal.vue'
 import InboundModal from '@/components/InboundModal.vue'
 import type { InventoryItem } from '@/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRoute } from 'vue-router'
 
 const inventoryStore = useInventoryStore()
 const userStore = useUserStore()
 const { getExpiryStatus } = useExpiry()
+const route = useRoute()
 
 const searchTerm = ref('')
 const showConsumeModal = ref(false)
+const showBatchConsumeModal = ref(false)
 const showInboundModal = ref(false)
 const selectedItem = ref<InventoryItem | null>(null)
+const selectedItems = ref<InventoryItem[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 const isImporting = ref(false)
 const isDownloadingTemplate = ref(false)
@@ -24,6 +29,60 @@ const pagination = reactive({
   page: 1,
   pageSize: 10,
 })
+
+// 状态筛选：0全部 1正常 2临期 3过期 4低于安全库存
+type InventoryStatusFilter = 0 | 1 | 2 | 3 | 4
+const statusFilter = ref<InventoryStatusFilter>(0)
+const statusOptions = [
+  { label: '全部状态', value: 0 },
+  { label: '正常', value: 1 },
+  { label: '临期', value: 2 },
+  { label: '过期', value: 3 },
+  { label: '低于安全库存', value: 4 },
+]
+
+const fetchData = () => {
+  inventoryStore.fetchInventory({
+    page: pagination.page,
+    page_size: pagination.pageSize,
+    material_name: searchTerm.value || undefined,
+    status: statusFilter.value,
+  })
+}
+
+watch(
+  () => route.query,
+  (query) => {
+    // 兼容看板 filterType 跳转联动
+    if (query.filterType === 'warning') {
+      statusFilter.value = 2 // 临期
+    } else if (query.filterType === 'expired') {
+      statusFilter.value = 3 // 过期
+    } else if (query.filterType === 'safety') {
+      statusFilter.value = 4 // 低于安全库存
+    } else {
+      statusFilter.value = 0 // 全部
+    }
+    pagination.page = 1
+    fetchData()
+  },
+  { immediate: true, deep: true }
+)
+
+const filteredInventory = computed(() => {
+  if (!Array.isArray(inventoryStore.inventory)) return []
+  return inventoryStore.inventory
+})
+
+const handleSearch = () => {
+  pagination.page = 1
+  fetchData()
+}
+
+const handleStatusChange = () => {
+  pagination.page = 1
+  fetchData()
+}
 
 const isBelowSafetyStock = (item: InventoryItem) => {
   const current = Number(item.current_qty)
@@ -36,28 +95,18 @@ const isBelowSafetyStock = (item: InventoryItem) => {
   return current <= safety
 }
 
-onMounted(() => {
-  fetchData()
-})
-
-const fetchData = () => {
-  inventoryStore.fetchInventory({
-    page: pagination.page,
-    page_size: pagination.pageSize,
-    material_name: searchTerm.value || undefined,
-  })
+const handleSelectionChange = (selection: InventoryItem[]) => {
+  selectedItems.value = selection
 }
 
-const filteredInventory = computed(() => {
-  const data = inventoryStore.inventory
-  if (!Array.isArray(data)) return []
-  return data
-})
-
-const handleSearch = () => {
-  pagination.page = 1
-  fetchData()
+const openBatchConsumeModal = () => {
+  if (selectedItems.value.length === 0) {
+    ElMessage.warning('请先勾选需要领用的物料')
+    return
+  }
+  showBatchConsumeModal.value = true
 }
+
 
 const handlePageChange = (page: number) => {
   pagination.page = page
@@ -199,7 +248,7 @@ const handleFileChange = async (event: Event) => {
     <div class="card">
       <!-- Toolbar -->
       <div class="toolbar">
-        <div class="search-box">
+        <div class="filter-group">
           <el-input
             v-model="searchTerm"
             placeholder="请输入物料名称搜索"
@@ -208,6 +257,14 @@ const handleFileChange = async (event: Event) => {
             @clear="handleSearch"
             @keyup.enter="handleSearch"
           />
+          <el-select v-model="statusFilter" class="status-select" @change="handleStatusChange">
+            <el-option
+              v-for="option in statusOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
         </div>
         <div class="actions">
           <input
@@ -240,6 +297,15 @@ const handleFileChange = async (event: Event) => {
           >
             下载Excel模板
           </el-button>
+          <el-button
+            type="primary"
+            plain
+            :icon="ShoppingCart"
+            :disabled="selectedItems.length === 0"
+            @click="openBatchConsumeModal"
+          >
+            批量领用 ({{ selectedItems.length }})
+          </el-button>
         </div>
       </div>
 
@@ -249,7 +315,9 @@ const handleFileChange = async (event: Event) => {
         :data="filteredInventory"
         style="width: 100%"
         class="custom-table"
+        @selection-change="handleSelectionChange"
       >
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="inbound_no" label="入库单号" min-width="150" show-overflow-tooltip />
         <el-table-column
           prop="material.code"
@@ -365,6 +433,7 @@ const handleFileChange = async (event: Event) => {
     </div>
 
     <ConsumeModal v-model="showConsumeModal" :item="selectedItem" />
+    <BatchConsumeModal v-model="showBatchConsumeModal" :items="selectedItems" @success="handleSelectionChange([])" />
     <InboundModal v-model:visible="showInboundModal" @success="handleInboundSuccess" />
   </div>
 </template>
@@ -394,8 +463,15 @@ const handleFileChange = async (event: Event) => {
   background-color: #f8fafc;
 }
 
-.search-box {
-  width: 300px;
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 520px;
+}
+
+.status-select {
+  width: 180px;
 }
 
 .actions {

@@ -37,7 +37,7 @@ export interface GetInventoryListParams {
   material_name?: string
   code?: string
   batch_no?: string
-  status?: number // 0:全部, 1:正常, 2:临期, 3:过期
+  status?: 0 | 1 | 2 | 3 | 4 // 0:全部, 1:正常, 2:临期, 3:过期, 4:低于安全库存
 }
 
 export const getInventoryList = (params?: GetInventoryListParams) => {

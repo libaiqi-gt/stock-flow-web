@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import { getAllOutboundList } from '@/api/outbound'
 import { markOutboundFinished } from '@/api/inventory'
 import type { OutboundItem } from '@/types'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { Check } from '@element-plus/icons-vue'
+import { Check, Search } from '@element-plus/icons-vue'
 import { useExpiry } from '@/composables/useExpiry'
 
 const { getExpiryStatus } = useExpiry()
@@ -15,12 +15,22 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = ref(10)
 
+const queryForm = reactive<{
+  keyword: string
+  status: '' | 'PENDING' | 'USING' | 'FINISHED'
+}>({
+  keyword: '',
+  status: '',
+})
+
 const fetchList = async () => {
   loading.value = true
   try {
     const res = await getAllOutboundList({
       page: page.value,
       page_size: pageSize.value,
+      keyword: queryForm.keyword || undefined,
+      status: queryForm.status || undefined,
     })
     const data = res.data as { list?: OutboundItem[]; total?: number }
     if (data) {
@@ -32,6 +42,11 @@ const fetchList = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const handleSearch = () => {
+  page.value = 1
+  fetchList()
 }
 
 const handlePageChange = () => {
@@ -75,6 +90,26 @@ const getStatusText = (status: string) => {
     default:
       return status
   }
+}
+
+type UsageDisplayStatus = 'PENDING' | 'USING' | 'FINISHED' | 'APPROVED' | 'REJECTED'
+
+// 统一计算“使用状态”展示值：审批状态优先于领用状态，确保“待审批/已驳回”展示准确
+const getDisplayStatus = (row: OutboundItem): UsageDisplayStatus => {
+  if (row.approval_status === 'PENDING') return 'PENDING'
+  if (row.approval_status === 'REJECTED') return 'REJECTED'
+  return row.status
+}
+
+// 待审批筛选场景或待审批行，均不展示操作按钮
+const shouldHideActionButton = (row: OutboundItem) => {
+  return queryForm.status === 'PENDING' || getDisplayStatus(row) === 'PENDING'
+}
+
+// 保留原有状态逻辑：仅非“已用完/已驳回/待审批”时可标记用完
+const canMarkFinished = (row: OutboundItem) => {
+  const displayStatus = getDisplayStatus(row)
+  return !shouldHideActionButton(row) && displayStatus !== 'FINISHED' && displayStatus !== 'REJECTED'
 }
 
 const formatDate = (date: string) => {
@@ -124,6 +159,7 @@ const handleMarkFinished = (row: OutboundItem) => {
       // cancel
     })
 }
+
 </script>
 
 <template>
@@ -131,6 +167,28 @@ const handleMarkFinished = (row: OutboundItem) => {
     <div class="card">
       <div class="toolbar">
         <div class="title">全部领用记录</div>
+        <div class="search-form">
+          <el-input
+            v-model="queryForm.keyword"
+            placeholder="单号/物料名称"
+            :prefix-icon="Search"
+            clearable
+            @clear="handleSearch"
+            @keyup.enter="handleSearch"
+            class="search-input"
+          />
+          <el-select
+            v-model="queryForm.status"
+            placeholder="领用状态"
+            clearable
+            @change="handleSearch"
+            class="status-select"
+          >
+            <el-option label="待审批" value="PENDING" />
+            <el-option label="使用中" value="USING" />
+            <el-option label="已用完" value="FINISHED" />
+          </el-select>
+        </div>
       </div>
 
       <el-table v-loading="loading" :data="list" stripe class="custom-table" style="width: 100%">
@@ -207,16 +265,16 @@ const handleMarkFinished = (row: OutboundItem) => {
         </el-table-column>
         <el-table-column label="使用状态" width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
-              {{ getStatusText(row.status) }}
+            <el-tag :type="getStatusType(getDisplayStatus(row))">
+              {{ getStatusText(getDisplayStatus(row)) }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="remarks" label="备注" min-width="150" show-overflow-tooltip />
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <el-button
-              v-if="row.status !== 'FINISHED'"
+              v-if="canMarkFinished(row)"
               type="primary"
               link
               :icon="Check"
@@ -224,7 +282,12 @@ const handleMarkFinished = (row: OutboundItem) => {
             >
               标记用完
             </el-button>
-            <span v-else class="text-gray-400 text-xs">--</span>
+            <span
+              v-if="!shouldHideActionButton(row) && (getDisplayStatus(row) === 'FINISHED' || getDisplayStatus(row) === 'REJECTED')"
+              class="text-gray-400 text-xs"
+            >
+              --
+            </span>
           </template>
         </el-table-column>
       </el-table>
@@ -273,6 +336,19 @@ const handleMarkFinished = (row: OutboundItem) => {
     font-size: 16px;
     font-weight: 600;
     color: #1e293b;
+  }
+
+  .search-form {
+    display: flex;
+    gap: 12px;
+
+    .search-input {
+      width: 240px;
+    }
+
+    .status-select {
+      width: 140px;
+    }
   }
 }
 

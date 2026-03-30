@@ -217,6 +217,39 @@ export const useInventoryStore = defineStore('inventory', () => {
     }
   }
 
+  const batchConsumeItems = async (itemsData: Array<{
+    item: InventoryItem
+    quantity: number
+    purpose: string
+    opening_date: string
+    remarks?: string
+  }>) => {
+    try {
+      loading.value = true
+      // 使用 Promise.all 模拟批量提交，后续有真实接口可直接替换
+      await Promise.all(
+        itemsData.map(data => 
+          applyOutbound({
+            inventory_id: data.item.id!,
+            quantity: data.quantity,
+            purpose: data.purpose,
+            opening_date: data.opening_date,
+            remarks: data.remarks,
+          })
+        )
+      )
+      ElMessage.success('批量领用申请已提交')
+      await fetchInventory()
+      await fetchOutbound()
+    } catch (error) {
+      console.error('Batch consume failed:', error)
+      ElMessage.error('部分或全部领用申请失败')
+      throw error
+    } finally {
+      loading.value = false
+    }
+  }
+
   const markAsFinished = async (recordId: number) => {
     try {
       await markOutboundFinishedApi(recordId)
@@ -268,6 +301,7 @@ export const useInventoryStore = defineStore('inventory', () => {
     importInventory,
     batchImport,
     consumeItem,
+    batchConsumeItems,
     markAsFinished,
     deleteItem,
     initData,

@@ -5,7 +5,8 @@ import { getAuditList, auditOutbound } from '@/api/outbound'
 import type { OutboundItem } from '@/types'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
-import { Refresh, Check, Close } from '@element-plus/icons-vue'
+import { Refresh, Check, Close, Edit } from '@element-plus/icons-vue'
+import EditConsumeModal from '@/components/EditConsumeModal.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -76,6 +77,8 @@ onMounted(() => {
 // Audit Modal
 const auditDialogVisible = ref(false)
 const currentAuditItem = ref<OutboundItem | null>(null)
+const editDialogVisible = ref(false)
+const currentEditItem = ref<OutboundItem | null>(null)
 const auditForm = reactive({
   approved: true, // true: Pass, false: Reject
   opinion: '',
@@ -87,6 +90,15 @@ const openAuditDialog = (row: OutboundItem) => {
   auditForm.approved = true
   auditForm.opinion = ''
   auditDialogVisible.value = true
+}
+
+const openEditDialog = (row: OutboundItem) => {
+  currentEditItem.value = row
+  editDialogVisible.value = true
+}
+
+const handleEditSuccess = () => {
+  fetchList()
 }
 
 const handleAuditSubmit = async () => {
@@ -213,16 +225,12 @@ const getStatusText = (status: string) => {
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="100" fixed="right" align="center">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button
-              v-if="row.approval_status === 'PENDING'"
-              type="primary"
-              link
-              @click="openAuditDialog(row)"
-            >
-              审批
-            </el-button>
+            <template v-if="row.approval_status === 'PENDING'">
+              <el-button type="primary" link :icon="Edit" @click="openEditDialog(row)">编辑</el-button>
+              <el-button type="primary" link @click="openAuditDialog(row)">审批</el-button>
+            </template>
             <span v-else class="text-gray-400 text-xs">--</span>
           </template>
         </el-table-column>
@@ -337,6 +345,12 @@ const getStatusText = (status: string) => {
         </div>
       </template>
     </el-dialog>
+
+    <EditConsumeModal
+      v-model="editDialogVisible"
+      :outbound-item="currentEditItem"
+      @success="handleEditSuccess"
+    />
   </div>
 </template>
 

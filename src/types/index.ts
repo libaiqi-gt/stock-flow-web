@@ -42,6 +42,16 @@ export interface AuditOutboundReq {
 }
 
 /**
+ * 审批管理编辑请求参数
+ */
+export interface EditAuditOutboundReq {
+  opening_date: string // YYYY-MM-DD
+  purpose: string
+  quantity: number
+  remarks?: string
+}
+
+/**
  * 领出记录/审批列表项模型
  * 对应 API 返回的完整结构
  */
@@ -60,7 +70,7 @@ export interface OutboundItem {
   }
   quantity: number
   purpose: string
-  status: 'USING' | 'FINISHED'
+  status: 'PENDING' | 'USING' | 'FINISHED'
   approval_status: 'PENDING' | 'APPROVED' | 'REJECTED'
   approval_opinion?: string
   approver_id?: number | null
